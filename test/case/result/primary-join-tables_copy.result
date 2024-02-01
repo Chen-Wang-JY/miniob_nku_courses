@@ -1,0 +1,62 @@
+INITIALIZATION
+CREATE TABLE join_table_1(id int, name char);
+SUCCESS
+CREATE TABLE join_table_2(id int, num int);
+SUCCESS
+CREATE TABLE join_table_3(id int, num2 int);
+SUCCESS
+create table join_table_empty_1(id int, num_empty_1 int);
+SUCCESS
+create table join_table_empty_2(id int, num_empty_2 int);
+SUCCESS
+
+INSERT INTO join_table_1 VALUES (1, 'a');
+SUCCESS
+INSERT INTO join_table_1 VALUES (2, 'b');
+SUCCESS
+INSERT INTO join_table_1 VALUES (3, 'c');
+SUCCESS
+INSERT INTO join_table_2 VALUES (1, 2);
+SUCCESS
+INSERT INTO join_table_2 VALUES (2, 15);
+SUCCESS
+INSERT INTO join_table_3 VALUES (1, 120);
+SUCCESS
+INSERT INTO join_table_3 VALUES (3, 800);
+SUCCESS
+
+1. SELECT
+Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id;
+1 | A | 1 | 2
+2 | B | 2 | 15
+JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
+Select join_table_1.name from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id;
+A
+B
+JOIN_TABLE_1.NAME
+Select join_table_2.num from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id;
+15
+2
+JOIN_TABLE_2.NUM
+Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id inner join join_table_3 on join_table_1.id=join_table_3.id;
+1 | A | 1 | 2 | 1 | 120
+JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM | JOIN_TABLE_3.ID | JOIN_TABLE_3.NUM2
+Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id and join_table_2.num>13 where join_table_1.name='b';
+2 | B | 2 | 15
+JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
+Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id and join_table_2.num>13 where join_table_1.name='a';
+JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
+Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id and join_table_2.num>23 where join_table_1.name='b';
+JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
+
+3. EMPTY
+select * from join_table_1 inner join join_table_empty_1 on join_table_1.id=join_table_empty_1.id;
+JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1
+select * from join_table_empty_1 inner join join_table_1 on join_table_empty_1.id=join_table_1.id;
+JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1 | JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME
+select * from join_table_empty_1 inner join join_table_empty_2 on join_table_empty_1.id = join_table_empty_2.id;
+JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1 | JOIN_TABLE_EMPTY_2.ID | JOIN_TABLE_EMPTY_2.NUM_EMPTY_2
+select * from join_table_1 inner join join_table_2 on join_table_1.id = join_table_2.id inner join join_table_empty_1 on join_table_1.id=join_table_empty_1.id;
+JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM | JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1
+select * from join_table_empty_1 inner join join_table_1 on join_table_empty_1.id=join_table_1.id inner join join_table_2 on join_table_1.id=join_table_2.id;
+JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1 | JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
