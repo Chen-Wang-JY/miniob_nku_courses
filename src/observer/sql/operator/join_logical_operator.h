@@ -24,7 +24,8 @@ See the Mulan PSL v2 for more details. */
 class JoinLogicalOperator : public LogicalOperator 
 {
 public:
-  JoinLogicalOperator() = default;
+  // JoinLogicalOperator() = default;
+  explicit JoinLogicalOperator(std::unique_ptr<Expression> join_condition);
   virtual ~JoinLogicalOperator() = default;
 
   LogicalOperatorType type() const override

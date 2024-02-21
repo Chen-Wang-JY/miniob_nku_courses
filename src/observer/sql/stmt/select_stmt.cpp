@@ -130,6 +130,34 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
+  // 检查每个 “=” 条件
+  // 进而判断是否要进行 join operation
+  auto conditions = select_sql.conditions.data();
+  auto condition_num = select_sql.conditions.size();
+  std::vector<JoinStmt> join_stmts;
+  for(size_t i = 0; i < condition_num; i++) {
+    if (conditions[i].comp == CompOp::EQUAL_TO) {
+      if (conditions[i].left_is_attr && conditions[i].right_is_attr) {
+        std::string left_table_name = conditions[i].left_attr.relation_name;
+        std::string right_talbe_name = conditions[i].right_attr.relation_name;
+        if (left_table_name != right_talbe_name) {
+          // join operation
+          FilterUnit* filter_unit = nullptr;
+          RC rc = FilterStmt::create_filter_unit(db, default_table, &table_map, conditions[i], filter_unit);
+          auto filter_obj_left = filter_unit->left().field;
+          auto filter_obj_right = filter_unit->right().field;
+          if (rc != RC::SUCCESS) {
+            LOG_WARN("failed to create filter unit. condition index=$d", i);
+            return rc;
+          }
+
+          JoinStmt join_stmt = {filter_obj_left, filter_obj_right}; // Join Stmt is "struct"
+          join_stmts.push_back(join_stmt);
+        }
+      }
+    }
+  }
+
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
   RC rc = FilterStmt::create(db,
@@ -149,6 +177,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->tables_.swap(tables);
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->join_stmts_ = join_stmts;
   stmt = select_stmt;
   return RC::SUCCESS;
 }

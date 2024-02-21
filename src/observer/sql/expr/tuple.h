@@ -100,6 +100,11 @@ public:
    */
   virtual RC cell_at(int index, Value &cell) const = 0;
 
+  virtual std::unique_ptr<Tuple> copy() const {
+    assert(false);
+    return nullptr;
+  }
+
   /**
    * @brief 根据cell的描述，获取cell的值
    * 
@@ -216,6 +221,17 @@ public:
   const Record &record() const
   {
     return *record_;
+  }
+
+  std::unique_ptr<Tuple> copy() const override {
+    std::unique_ptr<RowTuple> tuple(new RowTuple());
+    tuple->record_ = new Record(record_->copy());
+    tuple->table_ = table_;
+    tuple->speces_.reserve(speces_.size());
+    for (const FieldExpr *spec : speces_) {
+      tuple->speces_.push_back(new FieldExpr(*spec));
+    }
+    return tuple;
   }
 
 private:
@@ -418,6 +434,13 @@ public:
     }
 
     return right_->find_cell(spec, value);
+  }
+
+  std::unique_ptr<Tuple> copy() const {
+    std::unique_ptr<JoinedTuple> tuple(new JoinedTuple());
+    tuple->left_ = left_->copy().release();
+    tuple->right_ = right_->copy().release();
+    return tuple;
   }
 
 private:

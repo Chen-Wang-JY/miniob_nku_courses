@@ -83,6 +83,8 @@ RC LogicalPlanGenerator::create_plan(
 
   const std::vector<Table *> &tables = select_stmt->tables();
   const std::vector<Field> &all_fields = select_stmt->query_fields();
+  const std::vector<JoinStmt> join_stmts = select_stmt->join_stmts();
+  std::set<std::string> joined_tables;
   for (Table *table : tables) {
     std::vector<Field> fields;
     for (const Field &field : all_fields) {
@@ -95,11 +97,30 @@ RC LogicalPlanGenerator::create_plan(
     if (table_oper == nullptr) {
       table_oper = std::move(table_get_oper);
     } else {
-      JoinLogicalOperator *join_oper = new JoinLogicalOperator;
+      // JoinLogicalOperator *join_oper = new JoinLogicalOperator;
+
+      unique_ptr<Expression> join_condition;
+      // check if table_oper is left and table_get_oper is right
+      for (auto join_stmt: join_stmts) {
+        if (
+          (joined_tables.find(join_stmt.left_field.table_name()) != joined_tables.end()) // contains
+          && (join_stmt.right_field.table_name() == table->name())) {
+            
+            unique_ptr<Expression> left(new FieldExpr(join_stmt.left_field));
+            unique_ptr<Expression> right(new FieldExpr(join_stmt.right_field));
+            join_condition = unique_ptr<Expression> (
+              std::make_unique<ComparisonExpr>(CompOp::EQUAL_TO, std::move(left), std::move(right))
+            );
+            break;
+          }
+        
+      }
+      JoinLogicalOperator* join_oper = new JoinLogicalOperator(std::move(join_condition)); 
       join_oper->add_child(std::move(table_oper));
       join_oper->add_child(std::move(table_get_oper));
       table_oper = unique_ptr<LogicalOperator>(join_oper);
     }
+    joined_tables.insert(table->name());
   }
 
   unique_ptr<LogicalOperator> predicate_oper;

@@ -26,6 +26,11 @@ class FilterStmt;
 class Db;
 class Table;
 
+struct JoinStmt {
+  Field left_field;
+  Field right_field;
+};
+
 /**
  * @brief 表示select语句
  * @ingroup Statement
@@ -53,6 +58,10 @@ public:
   {
     return query_fields_;
   }
+  const std::vector<JoinStmt> &join_stmts() const
+  {
+    return join_stmts_;
+  }
   FilterStmt *filter_stmt() const
   {
     return filter_stmt_;
@@ -61,5 +70,6 @@ public:
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
+  std::vector<JoinStmt> join_stmts_;
   FilterStmt *filter_stmt_ = nullptr;
 };

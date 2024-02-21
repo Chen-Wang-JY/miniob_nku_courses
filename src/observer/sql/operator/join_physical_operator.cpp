@@ -14,8 +14,15 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/join_physical_operator.h"
 
-NestedLoopJoinPhysicalOperator::NestedLoopJoinPhysicalOperator()
-{}
+// NestedLoopJoinPhysicalOperator::NestedLoopJoinPhysicalOperator()
+// {}
+NestedLoopJoinPhysicalOperator::NestedLoopJoinPhysicalOperator(std::unique_ptr<Expression> join_condition)
+{
+  join_condition_ = std::move(join_condition);
+  if (join_condition != nullptr && join_condition->type() != ExprType::COMPARISON) {
+    LOG_WARN("join condition should be comparison expression");
+  }
+}
 
 RC NestedLoopJoinPhysicalOperator::open(Trx *trx)
 {
@@ -27,42 +34,49 @@ RC NestedLoopJoinPhysicalOperator::open(Trx *trx)
   RC rc = RC::SUCCESS;
   left_ = children_[0].get();
   right_ = children_[1].get();
-  right_closed_ = true;
-  round_done_ = true;
 
   rc = left_->open(trx);
   trx_ = trx;
+  rc = right_->open(trx);
+
+
+  while (left_->next() == RC::SUCCESS) {
+    auto left_tuple = left_->current_tuple()->copy();
+    left_tuples_.push_back(std::move(left_tuple));
+  }
+  while (right_->next() == RC::SUCCESS) {
+    auto right_tuple = right_->current_tuple()->copy();
+    for (auto &left_tuple: left_tuples_) {
+      std::unique_ptr<JoinedTuple> joined_tuple = std::make_unique<JoinedTuple>();
+      joined_tuple->set_left(left_tuple.get());
+      joined_tuple->set_right(right_tuple.get());
+      if (join_condition_ == nullptr) {
+        results_.push_back(std::move(joined_tuple));
+      }
+      else {
+        Value value;
+        rc = join_condition_->get_value(*joined_tuple, value);
+        if (rc != RC::SUCCESS) {
+          LOG_WARN("failed to get value from join condition. rc=%s", strrc(rc));
+          return rc;
+        }
+        if (value.get_boolean()) {
+          results_.push_back(std::move(joined_tuple));
+        }
+      }
+    }
+    right_tuples_.push_back(std::move(right_tuple));
+  }
+  result_idx_ = 0;
   return rc;
 }
 
 RC NestedLoopJoinPhysicalOperator::next()
 {
-  bool left_need_step = (left_tuple_ == nullptr);
-  RC rc = RC::SUCCESS;
-  if (round_done_) {
-    left_need_step = true;
-  } else {
-    rc = right_next();
-    if (rc != RC::SUCCESS) {
-      if (rc == RC::RECORD_EOF) {
-        left_need_step = true;
-      } else {
-        return rc;
-      }
-    } else {
-      return rc;  // got one tuple from right
-    }
-  }
-
-  if (left_need_step) {
-    rc = left_next();
-    if (rc != RC::SUCCESS) {
-      return rc;
-    }
-  }
-
-  rc = right_next();
-  return rc;
+  if (result_idx_ >= results_.size())
+    return RC::RECORD_EOF;
+  result_idx_++;
+  return RC::SUCCESS;
 }
 
 RC NestedLoopJoinPhysicalOperator::close()
@@ -71,66 +85,15 @@ RC NestedLoopJoinPhysicalOperator::close()
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to close left oper. rc=%s", strrc(rc));
   }
-
-  if (!right_closed_) {
-    rc = right_->close();
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to close right oper. rc=%s", strrc(rc));
-    } else {
-      right_closed_ = true;
-    }
+  rc = right_->close();
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to close right oper. rc=%s", strrc(rc));
   }
   return rc;
 }
 
 Tuple *NestedLoopJoinPhysicalOperator::current_tuple()
 {
-  return &joined_tuple_;
-}
-
-RC NestedLoopJoinPhysicalOperator::left_next()
-{
-  RC rc = RC::SUCCESS;
-  rc = left_->next();
-  if (rc != RC::SUCCESS) {
-    return rc;
-  }
-
-  left_tuple_ = left_->current_tuple();
-  joined_tuple_.set_left(left_tuple_);
-  return rc;
-}
-
-RC NestedLoopJoinPhysicalOperator::right_next()
-{
-  RC rc = RC::SUCCESS;
-  if (round_done_) {
-    if (!right_closed_) {
-      rc = right_->close();
-      right_closed_ = true;
-      if (rc != RC::SUCCESS) {
-        return rc;
-      }
-    }
-
-    rc = right_->open(trx_);
-    if (rc != RC::SUCCESS) {
-      return rc;
-    }
-    right_closed_ = false;
-
-    round_done_ = false;
-  }
-
-  rc = right_->next();
-  if (rc != RC::SUCCESS) {
-    if (rc == RC::RECORD_EOF) {
-      round_done_ = true;
-    }
-    return rc;
-  }
-
-  right_tuple_ = right_->current_tuple();
-  joined_tuple_.set_right(right_tuple_);
-  return rc;
+  return results_[result_idx_ - 1].get();
+  // return &joined_tuple_;
 }
